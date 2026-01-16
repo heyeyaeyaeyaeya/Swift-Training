@@ -7,5 +7,36 @@
 
 import Foundation
 
-print("Hello, World!")
+var userName: String = ""
+var userSurname: String = ""
+var userAge: Int = 0
+var acceptUserAgreement: Bool = false
 
+setUserName(&userName, to: "   ")
+setUserSurname(&userSurname, to: "Snow")
+setUserAge(&userAge, to: 0)
+setAcceptUserAgreement(&acceptUserAgreement, to: true)
+
+print(
+    registerUser(
+        userName: userName,
+        userSurname: userSurname,
+        userAge: userAge,
+        acceptUserAgreement: acceptUserAgreement
+    )
+)
+
+let isUserNameValidResult = isUserNameValid(userName)
+if !isUserNameValidResult {
+    print("User name is invalid")
+}
+
+let isUserAgeValidResult = isUserAgeValid(userAge)
+if !isUserAgeValidResult {
+    print("User age is invalid")
+}
+
+let isUserAgreementAcceptedResult = isUserAgreementAccepted(acceptUserAgreement)
+if !isUserAgreementAcceptedResult {
+    print("User agreement is not accepted")
+}
