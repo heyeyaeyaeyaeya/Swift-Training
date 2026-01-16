@@ -11,6 +11,10 @@ func isUserNameValid(_ userName: String) -> Bool {
     !userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
+func isUserSurnameValid(_ userSurname: String) -> Bool {
+    !userSurname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
 func isUserAgeValid(_ userAge: Int) -> Bool {
     userAge > 0
 }
@@ -18,3 +22,4 @@ func isUserAgeValid(_ userAge: Int) -> Bool {
 func isUserAgreementAccepted(_ acceptUserAgreement: Bool) -> Bool {
     acceptUserAgreement
 }
+

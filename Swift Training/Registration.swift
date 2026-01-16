@@ -28,6 +28,7 @@ func registerUser(
     acceptUserAgreement: Bool
 ) -> Bool {
     isUserNameValid(userName) &&
+    isUserSurnameValid(userSurname) &&
     isUserAgeValid(userAge) &&
     isUserAgreementAccepted(acceptUserAgreement)
 }
