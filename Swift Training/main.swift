@@ -12,9 +12,9 @@ var userSurname: String = ""
 var userAge: Int = 0
 var acceptUserAgreement: Bool = false
 
-setUserName(&userName, to: "   ")
+setUserName(&userName, to: "John")
 setUserSurname(&userSurname, to: "Snow")
-setUserAge(&userAge, to: 0)
+setUserAge(&userAge, to: 18)
 setAcceptUserAgreement(&acceptUserAgreement, to: true)
 
 print(
