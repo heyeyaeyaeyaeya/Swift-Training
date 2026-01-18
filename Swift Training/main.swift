@@ -26,17 +26,31 @@ print(
     )
 )
 
-let isUserNameValidResult = isUserNameValid(userName)
-if !isUserNameValidResult {
-    print("User name is invalid")
-}
+let isRegistered = registerUser(
+    userName: userName,
+    userSurname: userSurname,
+    userAge: userAge,
+    acceptUserAgreement: acceptUserAgreement
+)
 
-let isUserAgeValidResult = isUserAgeValid(userAge)
-if !isUserAgeValidResult {
-    print("User age is invalid")
-}
+if isRegistered {
+    print("✅ Registration success")
+} else {
+    print("❌ Registration failed")
 
-let isUserAgreementAcceptedResult = isUserAgreementAccepted(acceptUserAgreement)
-if !isUserAgreementAcceptedResult {
-    print("User agreement is not accepted")
+    if !isUserNameValid(userName) {
+        print("- User name is invalid")
+    }
+
+    if !isUserSurnameValid(userSurname) {
+        print("- User surname is invalid")
+    }
+
+    if !isUserAgeValid(userAge) {
+        print("- User age is invalid")
+    }
+
+    if !isUserAgreementAccepted(acceptUserAgreement) {
+        print("- User agreement is not accepted")
+    }
 }
