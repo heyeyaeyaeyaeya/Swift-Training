@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import WebKit
 
 struct ContentView: View {
     @State private var articles: [Article] = []
@@ -14,6 +15,7 @@ struct ContentView: View {
     @State private var nextContinueToken: String? = nil
     @State private var continueToken: String? = nil
     @State private var hasMore = true
+    @State private var selectedArticle: Article? = nil
 
     var body: some View {
         NavigationStack {
@@ -51,6 +53,10 @@ struct ContentView: View {
                                 .fill(Color(.systemBackground))
                                 .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                         )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedArticle = article
+                        }
                         .onAppear {
                             loadMoreIfNeeded(current: article)
                         }
@@ -87,6 +93,9 @@ struct ContentView: View {
             }
             .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
             .navigationTitle("WikiScroll")
+            .navigationDestination(item: $selectedArticle) { article in
+                ArticleDetailView(pageid: article.pageid, title: article.title)
+            }
             .background(Color(.systemGroupedBackground))
             .overlay {
                 if articles.isEmpty {
@@ -104,7 +113,7 @@ struct ContentView: View {
             return
         }
 
-        let thresholdIndex = articles.index(articles.endIndex, offsetBy: -15, limitedBy: articles.startIndex) ?? articles.startIndex
+        let thresholdIndex = articles.index(articles.endIndex, offsetBy: -7, limitedBy: articles.startIndex) ?? articles.startIndex
         if index >= thresholdIndex {
             Task {
                 await fetchArticles()
@@ -135,7 +144,7 @@ struct ContentView: View {
             URLQueryItem(name: "pithumbsize", value: "200"),
             URLQueryItem(name: "grnnamespace", value: "0"),
             URLQueryItem(name: "grnminsize", value: "10000"),
-            URLQueryItem(name: "grnlimit", value: "20")
+            URLQueryItem(name: "grnlimit", value: "10")
         ]
 
         if let nextContinueToken {
@@ -173,6 +182,66 @@ struct ContentView: View {
         } catch {
             hasMore = false
             print("Fetch failed: \(error.localizedDescription)")
+        }
+    }
+}
+
+private struct ArticleDetailView: View {
+    let pageid: Int
+    let title: String
+    @State private var text: String? = nil
+    @State private var isLoading = false
+    @State private var loadError: String? = nil
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+            } else if let loadError {
+                Text(loadError)
+                    .foregroundStyle(.secondary)
+            } else if text != nil {
+                WebViewSUI(url: URL(string: "https://ru.wikipedia.org/wiki/\(title)")!)
+            } else {
+                Text("No content.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadArticleInfo()
+        }
+    }
+
+    @MainActor
+    private func loadArticleInfo() async {
+        guard !isLoading else { return }
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+
+        var components = URLComponents(string: "https://ru.wikipedia.org/w/api.php")
+        components?.queryItems = [
+            URLQueryItem(name: "action", value: "parse"),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "prop", value: "text"),
+            URLQueryItem(name: "mobileformat", value: "1"),
+            URLQueryItem(name: "redirects", value: "1"),
+            URLQueryItem(name: "pageid", value: String(pageid))
+        ]
+
+        guard let url = components?.url else {
+            loadError = "Failed to build request."
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(WikiParseResponse.self, from: data)
+            text = response.parse?.text?.html
+        } catch {
+            loadError = "Failed to load article."
         }
     }
 }
@@ -227,6 +296,36 @@ private struct WikiContinue: Decodable {
     }
 }
 
+private struct WikiParseResponse: Decodable {
+    let parse: WikiParse?
+}
+
+private struct WikiParse: Decodable {
+    let title: String?
+    let pageid: Int?
+    let text: WikiParseText?
+}
+
+private struct WikiParseText: Decodable {
+    let html: String
+
+    private enum CodingKeys: String, CodingKey {
+        case html = "*"
+    }
+}
+
 #Preview {
     ContentView()
+}
+
+struct WebViewSUI: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        return WKWebView()
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        uiView.load(URLRequest(url: url))
+    }
 }
