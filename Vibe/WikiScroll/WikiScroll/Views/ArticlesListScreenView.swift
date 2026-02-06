@@ -7,15 +7,23 @@
 
 import Foundation
 import SwiftUI
-import WebKit
 
-struct ContentView: View {
+struct ArticlesListScreenView: View {
     @State private var articles: [Article] = []
     @State private var isLoading = false
     @State private var nextContinueToken: String? = nil
     @State private var continueToken: String? = nil
     @State private var hasMore = true
     @State private var selectedArticle: Article? = nil
+    private let skipAutoFetch: Bool
+
+    init(previewArticles: [Article]? = nil, skipAutoFetch: Bool = false) {
+        if let previewArticles {
+            _articles = State(initialValue: previewArticles)
+            _hasMore = State(initialValue: false)
+        }
+        self.skipAutoFetch = skipAutoFetch
+    }
 
     var body: some View {
         NavigationStack {
@@ -71,7 +79,7 @@ struct ContentView: View {
                 }
                 .scrollTargetLayout()
                 .padding(.vertical, 6)
-                
+
                 if hasMore {
                     Color.clear
                         .frame(height: 1)
@@ -81,7 +89,7 @@ struct ContentView: View {
                             }
                         }
                 }
-                
+
                 if isLoading && !articles.isEmpty {
                     HStack {
                         Spacer()
@@ -94,9 +102,9 @@ struct ContentView: View {
             .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
             .navigationTitle("WikiScroll")
             .navigationDestination(item: $selectedArticle) { article in
-                ArticleDetailView(pageid: article.pageid, title: article.title)
+                ArticleDetailScreenView(pageid: article.pageid, title: article.title)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(GradientBackgroundView())
             .overlay {
                 if articles.isEmpty {
                     ProgressView()
@@ -104,7 +112,9 @@ struct ContentView: View {
             }
         }
         .task {
-            await fetchArticles()
+            if !skipAutoFetch {
+                await fetchArticles()
+            }
         }
     }
 
@@ -131,7 +141,7 @@ struct ContentView: View {
         print("Fetch start. currentCount=\(articles.count)")
         defer { isLoading = false }
 
-        var components = URLComponents(string: "https://ru.wikipedia.org/w/api.php")
+        var components = URLComponents(string: "https://en.wikipedia.org/w/api.php")
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "action", value: "query"),
             URLQueryItem(name: "format", value: "json"),
@@ -186,146 +196,13 @@ struct ContentView: View {
     }
 }
 
-private struct ArticleDetailView: View {
-    let pageid: Int
-    let title: String
-    @State private var text: String? = nil
-    @State private var isLoading = false
-    @State private var loadError: String? = nil
-
-    var body: some View {
-        Group {
-            if isLoading {
-                ProgressView()
-            } else if let loadError {
-                Text(loadError)
-                    .foregroundStyle(.secondary)
-            } else if text != nil {
-                WebViewSUI(url: URL(string: "https://ru.wikipedia.org/wiki/\(title)")!)
-            } else {
-                Text("No content.")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await loadArticleInfo()
-        }
-    }
-
-    @MainActor
-    private func loadArticleInfo() async {
-        guard !isLoading else { return }
-        isLoading = true
-        loadError = nil
-        defer { isLoading = false }
-
-        var components = URLComponents(string: "https://ru.wikipedia.org/w/api.php")
-        components?.queryItems = [
-            URLQueryItem(name: "action", value: "parse"),
-            URLQueryItem(name: "format", value: "json"),
-            URLQueryItem(name: "prop", value: "text"),
-            URLQueryItem(name: "mobileformat", value: "1"),
-            URLQueryItem(name: "redirects", value: "1"),
-            URLQueryItem(name: "pageid", value: String(pageid))
-        ]
-
-        guard let url = components?.url else {
-            loadError = "Failed to build request."
-            return
-        }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(WikiParseResponse.self, from: data)
-            text = response.parse?.text?.html
-        } catch {
-            loadError = "Failed to load article."
-        }
-    }
-}
-
-private struct Article: Identifiable, Hashable {
-    let pageid: Int
-    let title: String
-    let extract: String?
-    let thumbnailURL: URL?
-
-    var id: Int {
-        pageid
-    }
-}
-
-private struct WikiResponse: Decodable {
-    let query: WikiQuery?
-    let continueInfo: WikiContinue?
-
-    private enum CodingKeys: String, CodingKey {
-        case query
-        case continueInfo = "continue"
-    }
-}
-
-private struct WikiQuery: Decodable {
-    let pages: [WikiPage]
-}
-
-private struct WikiPage: Decodable {
-    let pageid: Int
-    let title: String
-    let extract: String?
-    let thumbnail: WikiThumbnail?
-}
-
-private struct WikiThumbnail: Decodable {
-    let url: URL
-
-    private enum CodingKeys: String, CodingKey {
-        case url = "source"
-    }
-}
-
-private struct WikiContinue: Decodable {
-    let grncontinue: String?
-    let continueValue: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case grncontinue
-        case continueValue = "continue"
-    }
-}
-
-private struct WikiParseResponse: Decodable {
-    let parse: WikiParse?
-}
-
-private struct WikiParse: Decodable {
-    let title: String?
-    let pageid: Int?
-    let text: WikiParseText?
-}
-
-private struct WikiParseText: Decodable {
-    let html: String
-
-    private enum CodingKeys: String, CodingKey {
-        case html = "*"
-    }
-}
-
 #Preview {
-    ContentView()
+    ArticlesListScreenView(
+        previewArticles: [
+            Article(pageid: 1, title: "Apple", extract: "Apple is a fruit and a technology company.", thumbnailURL: nil),
+            Article(pageid: 2, title: "Swift", extract: "Swift is a programming language developed by Apple.", thumbnailURL: nil)
+        ],
+        skipAutoFetch: true
+    )
 }
 
-struct WebViewSUI: UIViewRepresentable {
-    let url: URL
-
-    func makeUIView(context: Context) -> WKWebView {
-        return WKWebView()
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        uiView.load(URLRequest(url: url))
-    }
-}
